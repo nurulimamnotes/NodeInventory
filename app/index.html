@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.3.14/angular.min.js"></script>
+<script src="bower_components/angular-route/angular-route.min.js"></script>
+<script src="bower_components/angular-animate/angular-animate.min.js"></script>
+<script src="bower_components/firebase/firebase.js"></script>
+<script src="bower_components/angularfire/dist/angularfire.min.js"></script>
+<body ng-app="myApp" ng-controller="mainController">
+
+<div ng-view></div>
+
+<script>
+"use strict";
+
+	const app=angular.module("myApp",["ngRoute","firebase"]);
+
+	app.config(function($routeProvider) {
+		$routeProvider
+
+			.when('/', {
+				templateUrl : 'login.html',
+				controller  : 'loginController'
+			})
+			
+			.when("/dashboard",{
+			  templateUrl : "dashboard.html",
+			  controller : "mainController"
+			});
+			
+	});
+
+
+	app.controller("loginController",function($scope,$firebaseAuth,$location){
+        
+        const ref=new Firebase("https://nodeinventory.firebaseio.com");
+
+        $scope.createUser=function(){
+        	ref.createUser({
+        		email: $scope.email,
+        		password: $scope.password
+        	},function(error,userData){
+        		if(error){
+        			console.log("couldnt create user");
+        		}
+        		else{
+        			console.log("user created");
+        			localStorage.setItem(Math.random(),"User sucesfully created");
+        		}
+        	})
+        }
+
+		$scope.login=function(){
+            ref.authWithPassword({
+            	email:$scope.email,
+            	password:$scope.password
+            },function(error,userData){
+            	if(error){
+            		console.log("login failed");
+            	}
+            	else{
+            		localStorage.setItem(Math.random(),$scope.email+" "+"logged in");
+            		$location.path("/dashboard");
+            	}
+            },{
+            	remember:"sessionOnly"
+            })
+            
+		}
+	})
+    
+    app.controller("mainController",function($scope,$http){
+
+    	let history=[];
+
+    	$scope.setNotifications=function(){
+    		// Let's check if the browser supports notifications
+          if (!("Notification" in window)) {
+              alert("This browser does not support desktop notification");
+           }
+
+           // Let's check whether notification permissions have alredy been granted
+           else if (Notification.permission === "granted") {
+              // If it's okay let's create a notification
+              console.log("notifications allowed");
+            }
+
+            // Otherwise, we need to ask the user for permission
+            else if (Notification.permission !== 'denied') {
+                Notification.requestPermission(function (permission) {
+                // If the user accepts, let's create a notification
+                if (permission === "granted") {
+                  let notification = new Notification("Thank you for allowing notifications");
+                }
+            });
+            }
+
+        };
+
+    	//upload history to my server
+    	$scope.uploadHistory=function(){
+    		for (let i = 0; i < localStorage.length; i++){
+    			history.push(localStorage.getItem(localStorage.key(i)));
+
+    		}
+
+    		$http.post("/history",{history}).
+    			success(function(data,status){
+    				console.log("history uploaded");
+    				new Notification("History was uploaded");
+    			}).
+    			error(function(data,status){
+    				console.log("upload failed");
+    				new Notification("History failed to upload");
+    			})
+
+    	}
+        
+        //delete a product
+    	$scope.deleteData=function(){
+
+    		$http.delete("/api/products/"+$scope.deleteId).
+    		success(function(data,status){
+    			console.log(status);
+    			localStorage.setItem(Math.random(),$scope.deleteId+" "+"deleted");
+    			
+    			new Notification($scope.deleteId+" "+"was deleted");
+    		}).
+    		error(function(){
+    			console.log("There is an error");
+    			new Notification("There was an error");
+    		})
+
+
+    	}
+
+
+    	//see current products
+    	$scope.seeData=function(){
+
+    	$http.get("/api/products").
+    	success(function(data){
+    		console.log(data);
+    		$scope.products=data;
+    	}).
+    	error(function(status){
+    		console.log("there was an error");
+    	})
+
+
+    	}
+        
+        //add a product
+    	$scope.postData=function(){
+
+        $http.post("/api/products",{"name":$scope.name, "sku":$scope.sku, "price":$scope.price}).
+    	success(function(data,status){
+    		console.log(data);
+    		console.log(status);
+
+    		new Notification($scope.name+" "+"was added");
+
+    		localStorage.setItem(Math.random(),$scope.name+" "+"was added");
+    	}).
+    	error(function(){
+    		console.log("there was an error");
+    		new Notification("There was an error");
+    	})
+
+    	}
+
+    	
+    })
+</script>
+</body>
+</html>
